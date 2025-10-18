@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ClassInTown – ERD (Pretty Single File)</title>
+<style>
+  :root{
+    --bg: #0b1020;
+    --panel: #121a33;
+    --card: #151f3f;
+    --ink: #dfe7ff;
+    --muted:#96a3c4;
+    --accent:#7aa2ff;
+    --accent-2:#52d6b6;
+    --accent-3:#ffb86b;
+    --edge:#7aa2ff77;
+    --edge-strong:#7aa2ffcc;
+    --good:#8be9a9;
+    --warn:#ffd27f;
+    --pill:#1b2750;
+    --shadow: 0 10px 25px rgba(0,0,0,.35);
+    --ring: 0 0 0 2px #7aa2ff44;
+  }
+  .light{
+    --bg:#f6f8ff;
+    --panel:#ffffff;
+    --card:#ffffff;
+    --ink:#121829;
+    --muted:#6b7280;
+    --accent:#2456ff;
+    --accent-2:#0ea5a5;
+    --accent-3:#d97706;
+    --edge:#2456ff44;
+    --edge-strong:#2456ff99;
+    --good:#059669;
+    --warn:#b45309;
+    --pill:#eef2ff;
+    --shadow: 0 10px 25px rgba(0,0,0,.08);
+    --ring: 0 0 0 2px #2456ff22;
+  }
+
+  * { box-sizing: border-box; }
+  html,body { height:100%; }
+  body{
+    margin:0;
+    font: 14px/1.4 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji","Segoe UI Emoji";
+    background: radial-gradient(1000px 600px at 20% -10%, #1a245a22, transparent),
+                radial-gradient(900px 500px at 120% 10%, #125d5a22, transparent),
+                var(--bg);
+    color:var(--ink);
+  }
+  .wrap{
+    max-width: 1200px;
+    margin: 24px auto;
+    padding: 16px;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; margin-bottom: 12px;
+  }
+  h1{
+    font-size: clamp(20px, 2.2vw, 28px);
+    margin:0;
+    letter-spacing:.2px;
+  }
+  .sub{
+    color:var(--muted); font-size:12.5px; margin-top:4px
+  }
+  .toolbar{ display:flex; gap:8px; align-items:center; }
+  .btn{
+    appearance:none; border:none; cursor:pointer; padding:8px 12px; border-radius:10px;
+    background: linear-gradient(180deg, var(--pill), transparent);
+    color:var(--ink); box-shadow: var(--ring), var(--shadow);
+    transition: transform .15s ease, box-shadow .2s ease;
+  }
+  .btn:hover{ transform: translateY(-1px); }
+  .legend{
+    display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin: 8px 0 16px;
+  }
+  .chip{
+    display:inline-flex; align-items:center; gap:6px; padding:6px 8px; border-radius:999px;
+    background: var(--pill); color: var(--ink); box-shadow: var(--shadow);
+    font-size:12px;
+  }
+  .dot{ width:10px; height:10px; border-radius:50%; background: var(--accent-2); }
+  .dot.edge{ background: var(--accent); }
+  .dot.warn{ background: var(--accent-3); }
+
+  /* Canvas grid */
+  .board{
+    position:relative;
+    border-radius:16px;
+    background: linear-gradient(180deg, var(--panel), #0c1230);
+    box-shadow: var(--shadow);
+    padding: 16px; overflow: hidden;
+  }
+  .svg-layer{
+    position:absolute; inset:0; pointer-events:none; filter: drop-shadow(0 1px 0 rgba(0,0,0,.25));
+  }
+
+  .cols{
+    position:relative;
+    display:grid;
+    grid-template-columns: repeat(5, minmax(200px,1fr));
+    gap:16px;
+  }
+  @media (max-width: 980px){
+    .cols{ grid-template-columns: repeat(2, minmax(220px,1fr)); }
+  }
+  @media (max-width: 560px){
+    .cols{ grid-template-columns: 1fr; }
+  }
+
+  .col{
+    display:flex; flex-direction:column; gap:12px; position:relative; z-index:2;
+  }
+  .col .title{
+    font-weight:600; color:var(--muted); letter-spacing:.3px; padding:4px 2px 0 2px;
+    text-transform:uppercase; font-size:11px;
+  }
+
+  /* Cards */
+  .card{
+    background: linear-gradient(180deg, var(--card), #0f1837);
+    border: 1px solid #ffffff0f;
+    border-radius:14px; padding:12px 12px 10px; box-shadow: var(--shadow);
+    outline: 1px solid #ffffff08;
+    position:relative; transition: transform .15s ease, outline-color .2s ease, box-shadow .2s ease;
+  }
+  .card:hover{
+    transform: translateY(-2px);
+    outline-color: var(--edge-strong);
+    box-shadow: 0 12px 30px #00000040;
+  }
+  .card.focus{
+    outline-color: var(--edge-strong);
+    box-shadow: 0 0 0 3px #ffffff0a, 0 0 0 6px var(--edge-strong), var(--shadow);
+  }
+
+  .head{
+    display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:8px;
+  }
+  .name{
+    font-weight:700; letter-spacing:.2px;
+  }
+  .badge{
+    font-size:11px; padding:2px 6px; border-radius:999px;
+    background: linear-gradient(180deg, #ffffff10, transparent);
+    border:1px solid #ffffff1a; color:var(--muted);
+  }
+  .kv{ display:grid; grid-template-columns: max-content 1fr; gap:2px 10px; font-size:12.5px; color:var(--muted); }
+  .kv b{ color:var(--ink); font-weight:600; }
+  .sep{ height:1px; background: #ffffff14; margin:8px 0; border-radius:1px; }
+
+  .pillrow{ display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .pill{
+    font-size:11.5px; padding:4px 8px; border-radius:999px; background:#ffffff12; color:var(--ink);
+    border:1px solid #ffffff1c;
+  }
+
+  /* Edge styles (drawn in SVG) */
+  .edge{ stroke: var(--edge); stroke-width:2.2; }
+  .edge.hl{ stroke: var(--edge-strong); stroke-width:3.2; }
+  .arrow{ fill: var(--edge); }
+  .arrow.hl{ fill: var(--edge-strong); }
+
+  /* Footer note */
+  footer{ color:var(--muted); font-size:12px; margin-top:10px; text-align:center; }
+  a.inline{ color: var(--accent); text-decoration: none; border-bottom: 1px dashed var(--accent-2); }
+  a.inline:hover{ opacity:.85; }
+</style>
+</head>
+<body class="">
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>ClassInTown – Entity Relationship Diagram</h1>
+        <div class="sub">Instructor_Class is a class <em>series/schedule</em>; Calendar_Event is a specific occurrence of that class. Enrollment links Student → Instructor_Class (payments hang off Enrollment).</div>
+      </div>
+      <div class="toolbar">
+        <button class="btn" id="toggleTheme" title="Toggle light/dark">🌗 Theme</button>
+        <button class="btn" id="resetFocus" title="Clear highlights">✨ Clear highlight</button>
+      </div>
+    </header>
+
+    <div class="legend">
+      <span class="chip"><span class="dot edge"></span> Relationship</span>
+      <span class="chip"><span class="dot"></span> Core / Schedule / Payments</span>
+      <span class="chip"><span class="dot warn"></span> One→Many semantics shown by arrow</span>
+    </div>
+
+    <div class="board" id="board">
+      <!-- SVG edge layer -->
+      <svg class="svg-layer" id="wires" xmlns="http://www.w3.org/2000/svg"></svg>
+
+      <!-- Columns of entity cards -->
+      <div class="cols" id="cols">
+        <!-- Geography -->
+        <div class="col" data-col="geo">
+          <div class="title">Geography</div>
+
+          <section class="card entity" id="Country" data-entity="Country">
+            <div class="head">
+              <div class="name">Country</div>
+              <span class="badge">PK: country_id</span>
+            </div>
+            <div class="kv"><b>has</b><span>States</span></div>
+          </section>
+
+          <section class="card entity" id="State" data-entity="State">
+            <div class="head">
+              <div class="name">State</div>
+              <span class="badge">PK: state_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>country_id → Country</span></div>
+            <div class="kv"><b>has</b><span>Cities</span></div>
+          </section>
+
+          <section class="card entity" id="City" data-entity="City">
+            <div class="head">
+              <div class="name">City</div>
+              <span class="badge">PK: city_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>state_id → State</span></div>
+            <div class="kv"><b>has</b><span>Locations</span></div>
+          </section>
+
+          <section class="card entity" id="Location" data-entity="Location">
+            <div class="head">
+              <div class="name">Location</div>
+              <span class="badge">PK: location_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>city_id → City</span></div>
+            <div class="pillrow">
+              <span class="pill">lat</span>
+              <span class="pill">lng</span>
+              <span class="pill">address</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Accounts / Identities -->
+        <div class="col" data-col="identity">
+          <div class="title">Identity & Profiles</div>
+
+          <section class="card entity" id="User" data-entity="User">
+            <div class="head">
+              <div class="name">User</div>
+              <span class="badge">PK: user_id</span>
+            </div>
+            <div class="kv"><b>has</b><span>System_User (Auth)</span></div>
+            <div class="kv"><b>has</b><span>User_Business_Profile</span></div>
+          </section>
+
+          <section class="card entity" id="System_User" data-entity="System_User">
+            <div class="head">
+              <div class="name">System_User (Auth)</div>
+              <span class="badge">PK: system_user_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>user_id → User</span></div>
+            <div class="pillrow">
+              <span class="pill">provider</span>
+              <span class="pill">email_verified</span>
+              <span class="pill">roles</span>
+            </div>
+          </section>
+
+          <section class="card entity" id="User_Business_Profile" data-entity="User_Business_Profile">
+            <div class="head">
+              <div class="name">User_Business_Profile</div>
+              <span class="badge">PK: ubp_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>user_id → User</span></div>
+            <div class="pillrow">
+              <span class="pill">business_name</span>
+              <span class="pill">gst/tax_ids</span>
+              <span class="pill">contact</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Organization / Roles -->
+        <div class="col" data-col="org">
+          <div class="title">Organization</div>
+
+          <section class="card entity" id="Institute" data-entity="Institute">
+            <div class="head">
+              <div class="name">Institute</div>
+              <span class="badge">PK: inst_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>city_id → City</span></div>
+            <div class="kv"><b>owner</b><span>user_id → User</span></div>
+          </section>
+
+          <section class="card entity" id="Instructor" data-entity="Instructor">
+            <div class="head">
+              <div class="name">Instructor</div>
+              <span class="badge">PK: instr_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>user_id → User</span></div>
+            <div class="kv"><b>FK</b><span>inst_id → Institute</span></div>
+          </section>
+
+          <section class="card entity" id="Activity" data-entity="Activity">
+            <div class="head">
+              <div class="name">Activity</div>
+              <span class="badge">PK: act_id</span>
+            </div>
+            <div class="pillrow">
+              <span class="pill">name</span>
+              <span class="pill">type</span>
+              <span class="pill">skill_level</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Teaching & Schedule -->
+        <div class="col" data-col="teach">
+          <div class="title">Teaching & Schedule</div>
+
+          <section class="card entity" id="Instructor_Class" data-entity="Instructor_Class">
+            <div class="head">
+              <div class="name">Instructor_Class (Series)</div>
+              <span class="badge">PK: iclass_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>instr_id → Instructor</span></div>
+            <div class="kv"><b>FK</b><span>act_id → Activity</span></div>
+            <div class="kv"><b>FK</b><span>location_id → Location</span></div>
+            <div class="pillrow">
+              <span class="pill">schedule_rule</span>
+              <span class="pill">capacity</span>
+              <span class="pill">price</span>
+            </div>
+          </section>
+
+          <section class="card entity" id="Calendar_Event" data-entity="Calendar_Event">
+            <div class="head">
+              <div class="name">Calendar_Event (Occurrence)</div>
+              <span class="badge">PK: event_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>iclass_id → Instructor_Class</span></div>
+            <div class="pillrow">
+              <span class="pill">starts_at</span>
+              <span class="pill">ends_at</span>
+              <span class="pill">status</span>
+            </div>
+          </section>
+        </div>
+
+        <!-- Students & Payments -->
+        <div class="col" data-col="enroll">
+          <div class="title">Students & Payments</div>
+
+          <section class="card entity" id="Student" data-entity="Student">
+            <div class="head">
+              <div class="name">Student</div>
+              <span class="badge">PK: student_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>user_id → User</span></div>
+          </section>
+
+          <section class="card entity" id="Enrollment" data-entity="Enrollment">
+            <div class="head">
+              <div class="name">Enrollment</div>
+              <span class="badge">PK: enroll_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>student_id → Student</span></div>
+            <div class="kv"><b>FK</b><span>iclass_id → Instructor_Class</span></div>
+            <div class="pillrow">
+              <span class="pill">status</span>
+              <span class="pill">joined_on</span>
+            </div>
+          </section>
+
+          <section class="card entity" id="Payment_Plan" data-entity="Payment_Plan">
+            <div class="head">
+              <div class="name">Payment_Plan</div>
+              <span class="badge">PK: plan_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>enroll_id → Enrollment</span></div>
+            <div class="pillrow">
+              <span class="pill">terms</span>
+              <span class="pill">total_amount</span>
+            </div>
+          </section>
+
+          <section class="card entity" id="Payment" data-entity="Payment">
+            <div class="head">
+              <div class="name">Payment</div>
+              <span class="badge">PK: payment_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>plan_id → Payment_Plan</span></div>
+            <div class="pillrow">
+              <span class="pill">amount</span>
+              <span class="pill">date</span>
+              <span class="pill">method</span>
+            </div>
+          </section>
+
+          <section class="card entity" id="Receipt" data-entity="Receipt">
+            <div class="head">
+              <div class="name">Receipt</div>
+              <span class="badge">PK: receipt_id</span>
+            </div>
+            <div class="kv"><b>FK</b><span>payment_id → Payment</span></div>
+            <div class="pillrow">
+              <span class="pill">number</span>
+              <span class="pill">issued_at</span>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Tip: Click any entity to highlight its relationships. Use the 🌗 Theme button for light/dark.
+    </footer>
+  </div>
+
+<script>
+/* -----------------------------------------------------------
+   Lightweight “auto-wiring” of relationships between cards.
+   Keeps it single-file, no external libs. Click a card to
+   highlight connected edges; theme toggle included.
+----------------------------------------------------------- */
+
+const RELS = [
+  // Geography
+  ["Country","State"], ["State","City"], ["City","Location"],
+  // Org
+  ["User","System_User"], ["User","User_Business_Profile"],
+  ["User","Institute"], ["User","Instructor"], // ownership/user link
+  ["Institute","Instructor"],
+  // Teaching
+  ["Instructor","Instructor_Class"],
+  ["Activity","Instructor_Class"],
+  ["Location","Instructor_Class"],
+  ["Instructor_Class","Calendar_Event"],
+  // Students/Enrollment/Payments
+  ["User","Student"],
+  ["Student","Enrollment"],
+  ["Instructor_Class","Enrollment"],
+  ["Enrollment","Payment_Plan"],
+  ["Payment_Plan","Payment"],
+  ["Payment","Receipt"]
+];
+
+// build index of DOM rects
+const svg = document.getElementById('wires');
+const cols = document.getElementById('cols');
+const cards = [...document.querySelectorAll('.entity')];
+
+function rectFor(el){
+  const b = el.getBoundingClientRect();
+  const host = svg.getBoundingClientRect();
+  return {
+    x: b.left - host.left,
+    y: b.top  - host.top,
+    w: b.width,
+    h: b.height
+  };
+}
+
+function anchorRight(r){ return { x: r.x + r.w, y: r.y + r.h/2 }; }
+function anchorLeft (r){ return { x: r.x,       y: r.y + r.h/2 }; }
+function mid(a,b){ return (a+b)/2; }
+
+function drawArrowhead(x,y,dir="right",cls="arrow"){
+  const size = 6;
+  let points;
+  if(dir==="right"){
+    points = `${x},${y} ${x-size},${y-size} ${x-size},${y+size}`;
+  }else{
+    points = `${x},${y} ${x+size},${y-size} ${x+size},${y+size}`;
+  }
+  const p = document.createElementNS("http://www.w3.org/2000/svg","polygon");
+  p.setAttribute("points", points);
+  p.setAttribute("class", cls);
+  svg.appendChild(p);
+  return p;
+}
+
+function drawEdge(aEl,bEl,highlight=false){
+  const ar = rectFor(aEl), br = rectFor(bEl);
+  const A = anchorRight(ar), B = anchorLeft(br);
+
+  // Curve via cubic Bézier
+  const mx = mid(A.x, B.x);
+  const d = `M ${A.x} ${A.y} C ${mx} ${A.y}, ${mx} ${B.y}, ${B.x} ${B.y}`;
+  const path = document.createElementNS("http://www.w3.org/2000/svg","path");
+  path.setAttribute("d", d);
+  path.setAttribute("class", `edge ${highlight?'hl':''}`);
+  svg.appendChild(path);
+
+  // Arrowhead at B
+  const arrow = drawArrowhead(B.x, B.y, "right", `arrow ${highlight?'hl':''}`);
+  return [path, arrow];
+}
+
+function layoutEdges(){
+  svg.innerHTML = "";
+  // Set full size
+  const host = cols.getBoundingClientRect();
+  svg.setAttribute("width", host.width);
+  svg.setAttribute("height", host.height);
+
+  RELS.forEach(([from,to])=>{
+    const a = document.getElementById(from);
+    const b = document.getElementById(to);
+    if(a && b){ drawEdge(a,b,false); }
+  });
+}
+
+let currentFocus = null;
+
+function clearFocus(){
+  currentFocus = null;
+  cards.forEach(c => c.classList.remove('focus'));
+  // remove and re-draw base edges
+  layoutEdges();
+}
+
+function focusEntity(id){
+  currentFocus = id;
+  cards.forEach(c => c.classList.toggle('focus', c.id===id));
+  svg.innerHTML = "";
+  const host = cols.getBoundingClientRect();
+  svg.setAttribute("width", host.width);
+  svg.setAttribute("height", host.height);
+
+  RELS.forEach(([from,to])=>{
+    const a = document.getElementById(from);
+    const b = document.getElementById(to);
+    if(!a || !b) return;
+    const involve = (from===id || to===id);
+    drawEdge(a,b,involve);
+    if(involve){
+      a.classList.add('focus');
+      b.classList.add('focus');
+    }
+  });
+}
+
+cards.forEach(card=>{
+  card.addEventListener('click', e=>{
+    e.stopPropagation();
+    if(currentFocus===card.id){ clearFocus(); }
+    else { focusEntity(card.id); }
+  });
+});
+
+document.getElementById('resetFocus').addEventListener('click', clearFocus);
+window.addEventListener('resize', layoutEdges);
+layoutEdges();
+
+// Theme toggle
+const btnTheme = document.getElementById('toggleTheme');
+let light = false;
+btnTheme.addEventListener('click', ()=>{
+  light = !light;
+  document.body.classList.toggle('light', light);
+});
+
+</script>
+</body>
+</html>
